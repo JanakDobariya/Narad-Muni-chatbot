@@ -7,7 +7,7 @@ import os
 load_dotenv()
 
 # Initialize Groq client with API key from environment
-groq_api_key = os.getenv("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")
+groq_api_key = os.getenv("GROQ_API_KEY")
 if not groq_api_key:
     st.error("GROQ_API_KEY not set. Please add it to your .env file.")
     st.stop()
