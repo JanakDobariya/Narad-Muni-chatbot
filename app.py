@@ -1,48 +1,49 @@
+import os
+
 import streamlit as st
 from dotenv import load_dotenv
 from groq import Groq
-import os
 
-# Load environment variables (like GROQ_API_KEY)
+
+st.set_page_config(page_title="Narad Muni Chatbot", page_icon="💬")
 load_dotenv()
 
-# Initialize Groq client with API key from environment
-groq_api_key = os.getenv("GROQ_API_KEY")
-if not groq_api_key:
-    st.error("GROQ_API_KEY not set. Please add it to your .env file.")
-    st.stop()
-groq_client = Groq(api_key=groq_api_key)
-
-def groq_invoke(messages, model="llama3-70b-8192"):
-    # Prepare messages for Groq (alternating user/assistant)
-    formatted_messages = []
-    for i, m in enumerate(messages):
-        role = "user" if i % 2 == 0 else "assistant"
-        formatted_messages.append({"role": role, "content": m})
-    # Call Groq API
-    completion = groq_client.chat.completions.create(
-        model=model,
-        messages=formatted_messages
-    )
-    return completion.choices[0].message.content
-
-# --- Streamlit UI setup ---
-st.set_page_config(page_title="Narad Muni Chatbot", page_icon="🤖")
 st.title("💬 Narad Muni Chatbot")
-st.caption("Made by Janak Dobariya")
+st.caption("A simple conversational assistant powered by Groq")
 
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
+try:
+    streamlit_api_key = st.secrets.get("GROQ_API_KEY")
+except Exception:
+    streamlit_api_key = None
+api_key = os.getenv("GROQ_API_KEY") or streamlit_api_key
+if not api_key:
+    st.error("GROQ_API_KEY is not configured. Add it to a local .env file or the deployment secrets.")
+    st.stop()
 
-user_input = st.chat_input("Ask me anything...")
+client = Groq(api_key=api_key)
 
-if user_input:
-    st.session_state.chat_history.append(user_input)
-    response = groq_invoke(st.session_state.chat_history)
-    st.session_state.chat_history.append(response)
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-# Display chat history
-for i, message in enumerate(st.session_state.chat_history):
-    is_user = i % 2 == 0  # Even index = user, odd = AI
-    with st.chat_message("user" if is_user else "assistant"):
-        st.markdown(message)
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+if prompt := st.chat_input("Ask me anything..."):
+    user_message = {"role": "user", "content": prompt}
+    st.session_state.messages.append(user_message)
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    try:
+        completion = client.chat.completions.create(
+            model="openai/gpt-oss-120b",
+            messages=st.session_state.messages,
+        )
+        response = completion.choices[0].message.content or "I could not generate a response."
+    except Exception:
+        st.error("The chat service is unavailable right now. Please try again shortly.")
+    else:
+        st.session_state.messages.append({"role": "assistant", "content": response})
+        with st.chat_message("assistant"):
+            st.markdown(response)
